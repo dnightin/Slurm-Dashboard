@@ -24,13 +24,13 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000`.
+Open `http://localhost:3018`.
 
 ## Configuration
 
 Environment variables:
 
-- `PORT`: HTTP port, defaults to `3000`
+- `PORT`: HTTP port, defaults to `3018`
 - `HOST`: bind address, defaults to `0.0.0.0`
 - `SLURM_COMMAND_TIMEOUT_MS`: timeout per Slurm command, defaults to `12000`
 - `SLURM_HISTORY_START`: `sacct -S` start value, defaults to `now-24hours`
@@ -49,4 +49,3 @@ PORT=8080 SLURM_HISTORY_START=now-7days npm start
 ## Notes
 
 This app intentionally has no external npm runtime dependencies. `npm install` is still useful for standard npm workflows and future lockfile generation, but the dashboard can run directly with Node.
-
