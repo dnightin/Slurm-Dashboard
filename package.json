@@ -1,0 +1,21 @@
+{
+  "name": "slurm-dashboard",
+  "version": "0.1.0",
+  "description": "A lightweight npm-powered Slurm cluster dashboard backed by sacct, sinfo, and squeue.",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "check": "node --check server.js"
+  },
+  "keywords": [
+    "slurm",
+    "cluster",
+    "dashboard",
+    "hpc"
+  ],
+  "author": "",
+  "license": "MIT"
+}
+
