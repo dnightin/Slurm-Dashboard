@@ -107,6 +107,44 @@ function parseSinfo(output) {
   ]);
 }
 
+function parseScontrolNodes(output) {
+  return output
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const node = {};
+      const matches = line.matchAll(/(\S+?)=(.*?)(?=\s+\S+=|$)/g);
+
+      for (const match of matches) {
+        node[match[1]] = match[2].trim();
+      }
+
+      const cpuTotal = Number.parseInt(node.CPUTot, 10) || 0;
+      const cpuAllocated = Number.parseInt(node.CPUAlloc, 10) || 0;
+      const memoryTotal = Number.parseInt(node.RealMemory, 10) || 0;
+      const memoryAllocated = Number.parseInt(node.AllocMem, 10) || 0;
+
+      return {
+        name: node.NodeName || "",
+        partition: node.Partitions || "",
+        state: node.State || "",
+        cpuAllocated,
+        cpuTotal,
+        cpuIdle: Number.parseInt(node.CPUIdle, 10) || Math.max(cpuTotal - cpuAllocated, 0),
+        cpuOther: Number.parseInt(node.CPUOther, 10) || 0,
+        memoryAllocated,
+        memoryTotal,
+        memoryFree: Number.parseInt(node.FreeMem, 10) || 0,
+        gres: node.Gres || "",
+        gresUsed: node.GresUsed || "",
+        reason: node.Reason || "",
+        address: node.NodeAddr || "",
+        hostname: node.NodeHostName || ""
+      };
+    });
+}
+
 function parseNodeSummaries(partitions) {
   return partitions.reduce((acc, partition) => {
     const state = normalizeState(partition.state);
@@ -122,6 +160,21 @@ function normalizeState(state) {
     .toLowerCase()
     .replace(/[~*+#$@!%^-]+/g, "")
     .trim() || "unknown";
+}
+
+function summarizeNodeResources(resources) {
+  return resources.reduce((acc, node) => {
+    acc.cpuAllocated += node.cpuAllocated;
+    acc.cpuTotal += node.cpuTotal;
+    acc.memoryAllocated += node.memoryAllocated;
+    acc.memoryTotal += node.memoryTotal;
+    return acc;
+  }, {
+    cpuAllocated: 0,
+    cpuTotal: 0,
+    memoryAllocated: 0,
+    memoryTotal: 0
+  });
 }
 
 function summarizeJobs(activeJobs, recentJobs) {
@@ -158,7 +211,7 @@ function commandStatus(results) {
 }
 
 async function collectClusterData() {
-  const [squeue, sacct, sinfo] = await Promise.all([
+  const [squeue, sacct, sinfo, scontrolNodes] = await Promise.all([
     runCommand("squeue", [
       "-h",
       "-o",
@@ -176,12 +229,19 @@ async function collectClusterData() {
       "-h",
       "-o",
       "%P|%a|%l|%D|%t|%N"
+    ]),
+    runCommand("scontrol", [
+      "show",
+      "nodes",
+      "-o"
     ])
   ]);
 
   const activeJobs = squeue.ok ? parseSqueue(squeue.stdout) : [];
   const recentJobs = sacct.ok ? parseSacct(sacct.stdout) : [];
   const partitions = sinfo.ok ? parseSinfo(sinfo.stdout) : [];
+  const nodeResources = scontrolNodes.ok ? parseScontrolNodes(scontrolNodes.stdout) : [];
+  const resourceSummary = summarizeNodeResources(nodeResources);
   const nodes = parseNodeSummaries(partitions);
   const jobs = summarizeJobs(activeJobs, recentJobs);
 
@@ -195,14 +255,20 @@ async function collectClusterData() {
       runningJobs: jobs.running,
       pendingJobs: jobs.pending,
       activeUsers: jobs.users,
-      totalNodes: nodes.total
+      totalNodes: nodeResources.length || nodes.total,
+      allocatedCpus: resourceSummary.cpuAllocated,
+      totalCpus: resourceSummary.cpuTotal,
+      allocatedMemoryMb: resourceSummary.memoryAllocated,
+      totalMemoryMb: resourceSummary.memoryTotal
     },
     jobs,
     nodes,
     activeJobs,
     recentJobs,
     partitions,
-    commands: commandStatus({ squeue, sacct, sinfo })
+    nodeResources,
+    resourceSummary,
+    commands: commandStatus({ squeue, sacct, sinfo, scontrol: scontrolNodes })
   };
 }
 

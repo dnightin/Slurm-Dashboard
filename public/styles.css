@@ -36,18 +36,30 @@ select {
   font: inherit;
 }
 
-.topbar {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 24px;
-  padding: 26px clamp(16px, 3vw, 40px);
-  border-bottom: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(16px);
+.app-shell {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
   position: sticky;
   top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 24px 18px;
+  border-right: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  overflow: auto;
   z-index: 10;
+}
+
+.brand {
+  display: grid;
+  gap: 8px;
 }
 
 .eyebrow,
@@ -78,8 +90,47 @@ h2 {
 
 main {
   width: min(1600px, 100%);
-  margin: 0 auto;
+  margin: 0;
   padding: 24px clamp(16px, 3vw, 40px) 40px;
+}
+
+.section {
+  scroll-margin-top: 24px;
+  margin-bottom: 18px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.section-nav,
+.sidebar-controls {
+  display: grid;
+  gap: 10px;
+}
+
+.section-nav a {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.section-nav a:hover,
+.section-nav a:focus {
+  border-color: var(--line);
+  background: var(--surface-alt);
+  outline: none;
 }
 
 .toolbar {
@@ -110,7 +161,7 @@ button {
 }
 
 input {
-  width: min(320px, 62vw);
+  width: 100%;
   padding: 0 12px;
 }
 
@@ -133,9 +184,8 @@ button:hover {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 18px;
 }
 
 .stat,
@@ -164,9 +214,9 @@ button:hover {
   line-height: 1;
 }
 
-.layout {
+.grid-section {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   align-items: start;
 }
@@ -215,7 +265,7 @@ button:hover {
 
 table {
   width: 100%;
-  min-width: 940px;
+  min-width: 980px;
   border-collapse: collapse;
 }
 
@@ -259,6 +309,10 @@ tbody tr:hover {
   display: grid;
   gap: 10px;
   padding: 14px;
+}
+
+.command-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .list-item {
@@ -343,6 +397,33 @@ tbody tr:hover {
   background: var(--accent);
 }
 
+.resource-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fbfcfb;
+}
+
+.resource-summary > div,
+.metric-cell {
+  display: grid;
+  gap: 7px;
+}
+
+.resource-summary span,
+.metric-cell span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.resource-summary strong {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
 .state {
   display: inline-flex;
   align-items: center;
@@ -371,30 +452,32 @@ tbody tr:hover {
 }
 
 @media (max-width: 1120px) {
-  .stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .layout {
+  .app-shell {
     grid-template-columns: 1fr;
   }
 
-  .side {
+  .sidebar {
+    position: static;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .section-nav {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .sidebar-controls {
+    grid-template-columns: minmax(220px, 1fr) 150px 120px;
+    align-items: end;
+  }
+
+  .stats-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
-  .topbar {
-    position: static;
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .toolbar {
-    justify-content: stretch;
-  }
-
   .search,
   .select,
   input,
@@ -403,9 +486,12 @@ tbody tr:hover {
     width: 100%;
   }
 
+  .section-nav,
+  .sidebar-controls,
   .stats-grid,
-  .side {
+  .grid-section,
+  .command-grid,
+  .resource-summary {
     grid-template-columns: 1fr;
   }
 }
-

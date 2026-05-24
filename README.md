@@ -7,6 +7,7 @@ A lightweight npm-powered dashboard for Slurm clusters. The Node backend shells 
 - `squeue` for active queue data
 - `sacct` for recent accounting data
 - `sinfo` for partition and node-state summaries
+- `scontrol show nodes -o` for per-node CPU, memory, GRES, and state allocation
 
 Each command is collected independently. If one command is unavailable or times out, the dashboard still renders the remaining data and shows the failure in the command-health panel.
 

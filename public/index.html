@@ -7,65 +7,84 @@
     <link rel="stylesheet" href="/styles.css">
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <p class="eyebrow">Slurm Dashboard</p>
-        <h1 id="clusterHost">Cluster</h1>
-      </div>
-      <div class="toolbar">
-        <label class="search">
-          <span>Search</span>
-          <input id="searchInput" type="search" placeholder="job, user, partition">
-        </label>
-        <label class="select">
-          <span>Refresh</span>
-          <select id="refreshSelect">
-            <option value="15000">15s</option>
-            <option value="30000" selected>30s</option>
-            <option value="60000">60s</option>
-            <option value="0">Paused</option>
-          </select>
-        </label>
-        <button id="refreshButton" type="button">Refresh</button>
-      </div>
-    </header>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Dashboard sections">
+        <div class="brand">
+          <p class="eyebrow">Slurm Dashboard</p>
+          <h1 id="clusterHost">Cluster</h1>
+          <span id="lastUpdated" class="pill">Waiting</span>
+        </div>
 
-    <main>
-      <section class="stats-grid" aria-label="Cluster summary">
-        <article class="stat">
-          <span>Running</span>
-          <strong id="runningJobs">0</strong>
-        </article>
-        <article class="stat">
-          <span>Pending</span>
-          <strong id="pendingJobs">0</strong>
-        </article>
-        <article class="stat">
-          <span>Active Jobs</span>
-          <strong id="activeJobs">0</strong>
-        </article>
-        <article class="stat">
-          <span>Recent Jobs</span>
-          <strong id="recentJobs">0</strong>
-        </article>
-        <article class="stat">
-          <span>Active Users</span>
-          <strong id="activeUsers">0</strong>
-        </article>
-        <article class="stat">
-          <span>Nodes</span>
-          <strong id="totalNodes">0</strong>
-        </article>
-      </section>
+        <nav class="section-nav">
+          <a href="#overview">Overview</a>
+          <a href="#queue">Queue</a>
+          <a href="#nodes">Node Allocation</a>
+          <a href="#partitions">Partitions</a>
+          <a href="#accounting">Accounting</a>
+          <a href="#commands">Commands</a>
+        </nav>
 
-      <section class="layout">
-        <div class="panel table-panel">
+        <div class="sidebar-controls">
+          <label class="search">
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="job, user, node">
+          </label>
+          <label class="select">
+            <span>Refresh</span>
+            <select id="refreshSelect">
+              <option value="15000">15s</option>
+              <option value="30000" selected>30s</option>
+              <option value="60000">60s</option>
+              <option value="0">Paused</option>
+            </select>
+          </label>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+      </aside>
+
+      <main>
+        <section id="overview" class="section">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Overview</p>
+              <h2>Cluster Summary</h2>
+            </div>
+          </div>
+          <div class="stats-grid" aria-label="Cluster summary">
+            <article class="stat">
+              <span>Running</span>
+              <strong id="runningJobs">0</strong>
+            </article>
+            <article class="stat">
+              <span>Pending</span>
+              <strong id="pendingJobs">0</strong>
+            </article>
+            <article class="stat">
+              <span>Active Jobs</span>
+              <strong id="activeJobs">0</strong>
+            </article>
+            <article class="stat">
+              <span>Recent Jobs</span>
+              <strong id="recentJobs">0</strong>
+            </article>
+            <article class="stat">
+              <span>Active Users</span>
+              <strong id="activeUsers">0</strong>
+            </article>
+            <article class="stat">
+              <span>Nodes</span>
+              <strong id="totalNodes">0</strong>
+            </article>
+          </div>
+        </section>
+
+        <section id="queue" class="section panel table-panel">
           <div class="panel-heading">
             <div>
-              <h2>Queue</h2>
+              <p class="eyebrow">Queue</p>
+              <h2>Active Jobs</h2>
               <p id="queueCaption">Active jobs from squeue</p>
             </div>
-            <span id="lastUpdated" class="pill">Waiting</span>
           </div>
           <div class="table-wrap">
             <table>
@@ -86,62 +105,111 @@
               </tbody>
             </table>
           </div>
-        </div>
+        </section>
 
-        <aside class="side">
-          <section class="panel">
+        <section id="nodes" class="section panel table-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Resources</p>
+              <h2>Per-Node Allocation</h2>
+              <p id="nodeResourceCaption">CPU and memory allocation from scontrol</p>
+            </div>
+          </div>
+          <div class="resource-summary">
+            <div>
+              <span>CPU Allocation</span>
+              <strong id="cpuAllocation">0 / 0</strong>
+              <div class="bar-track"><div id="cpuAllocationBar" class="bar-fill"></div></div>
+            </div>
+            <div>
+              <span>Memory Allocation</span>
+              <strong id="memoryAllocation">0 / 0</strong>
+              <div class="bar-track"><div id="memoryAllocationBar" class="bar-fill"></div></div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Node</th>
+                  <th>State</th>
+                  <th>Partition</th>
+                  <th>CPU</th>
+                  <th>Memory</th>
+                  <th>GRES</th>
+                  <th>Reason</th>
+                </tr>
+              </thead>
+              <tbody id="nodeResourceBody">
+                <tr><td colspan="7" class="empty">Loading node allocation data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="partitions" class="section grid-section">
+          <div class="panel">
             <div class="panel-heading">
-              <h2>Partitions</h2>
+              <div>
+                <p class="eyebrow">Partitions</p>
+                <h2>Partition Status</h2>
+              </div>
             </div>
             <div id="partitionList" class="list"></div>
-          </section>
+          </div>
 
-          <section class="panel">
+          <div class="panel">
             <div class="panel-heading">
-              <h2>Node States</h2>
+              <div>
+                <p class="eyebrow">Nodes</p>
+                <h2>Node States</h2>
+              </div>
             </div>
             <div id="nodeStates" class="bars"></div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-heading">
-              <h2>Commands</h2>
-            </div>
-            <div id="commandHealth" class="list"></div>
-          </section>
-        </aside>
-      </section>
-
-      <section class="panel table-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>Recent Accounting</h2>
-            <p id="historyCaption">Recent jobs from sacct</p>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Job</th>
-                <th>User</th>
-                <th>State</th>
-                <th>Partition</th>
-                <th>Elapsed</th>
-                <th>CPU</th>
-                <th>Submitted</th>
-                <th>Exit</th>
-              </tr>
-            </thead>
-            <tbody id="historyBody">
-              <tr><td colspan="8" class="empty">Loading accounting data...</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
+        </section>
+
+        <section id="accounting" class="section panel table-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Accounting</p>
+              <h2>Recent Jobs</h2>
+              <p id="historyCaption">Recent jobs from sacct</p>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <th>User</th>
+                  <th>State</th>
+                  <th>Partition</th>
+                  <th>Elapsed</th>
+                  <th>CPU</th>
+                  <th>Submitted</th>
+                  <th>Exit</th>
+                </tr>
+              </thead>
+              <tbody id="historyBody">
+                <tr><td colspan="8" class="empty">Loading accounting data...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="commands" class="section panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow">Health</p>
+              <h2>Command Status</h2>
+            </div>
+          </div>
+          <div id="commandHealth" class="list command-grid"></div>
+        </section>
+      </main>
+    </div>
 
     <script src="/app.js"></script>
   </body>
 </html>
-

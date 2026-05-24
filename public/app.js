@@ -12,9 +12,15 @@ const els = {
   recentJobs: document.querySelector("#recentJobs"),
   activeUsers: document.querySelector("#activeUsers"),
   totalNodes: document.querySelector("#totalNodes"),
+  cpuAllocation: document.querySelector("#cpuAllocation"),
+  cpuAllocationBar: document.querySelector("#cpuAllocationBar"),
+  memoryAllocation: document.querySelector("#memoryAllocation"),
+  memoryAllocationBar: document.querySelector("#memoryAllocationBar"),
   lastUpdated: document.querySelector("#lastUpdated"),
   queueBody: document.querySelector("#queueBody"),
   historyBody: document.querySelector("#historyBody"),
+  nodeResourceBody: document.querySelector("#nodeResourceBody"),
+  nodeResourceCaption: document.querySelector("#nodeResourceCaption"),
   partitionList: document.querySelector("#partitionList"),
   nodeStates: document.querySelector("#nodeStates"),
   commandHealth: document.querySelector("#commandHealth"),
@@ -44,6 +50,17 @@ function number(value) {
   return new Intl.NumberFormat().format(Number(value || 0));
 }
 
+function percent(allocated, total) {
+  return total > 0 ? Math.min(Math.round((allocated / total) * 100), 100) : 0;
+}
+
+function memory(value) {
+  const mb = Number(value || 0);
+  if (mb >= 1024 * 1024) return `${number((mb / 1024 / 1024).toFixed(1))} TB`;
+  if (mb >= 1024) return `${number((mb / 1024).toFixed(1))} GB`;
+  return `${number(mb)} MB`;
+}
+
 function stateClass(value) {
   return text(value, "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
@@ -60,6 +77,12 @@ function setSummary(summary) {
   els.recentJobs.textContent = number(summary.recentJobs);
   els.activeUsers.textContent = number(summary.activeUsers);
   els.totalNodes.textContent = number(summary.totalNodes);
+  const cpuPct = percent(summary.allocatedCpus, summary.totalCpus);
+  const memoryPct = percent(summary.allocatedMemoryMb, summary.totalMemoryMb);
+  els.cpuAllocation.textContent = `${number(summary.allocatedCpus)} / ${number(summary.totalCpus)} cores (${cpuPct}%)`;
+  els.cpuAllocationBar.style.width = `${cpuPct}%`;
+  els.memoryAllocation.textContent = `${memory(summary.allocatedMemoryMb)} / ${memory(summary.totalMemoryMb)} (${memoryPct}%)`;
+  els.memoryAllocationBar.style.width = `${memoryPct}%`;
 }
 
 function renderQueue(jobs) {
@@ -106,6 +129,43 @@ function renderHistory(jobs) {
       <td>${escapeHtml(job.exitCode)}</td>
     </tr>
   `).join("");
+}
+
+function renderNodeResources(nodes) {
+  const rows = nodes.filter(matchesQuery);
+  els.nodeResourceCaption.textContent = `${number(rows.length)} nodes from scontrol`;
+
+  if (!rows.length) {
+    els.nodeResourceBody.innerHTML = `<tr><td colspan="7" class="empty">No node allocation rows match the current view.</td></tr>`;
+    return;
+  }
+
+  els.nodeResourceBody.innerHTML = rows.map((node) => {
+    const cpuPct = percent(node.cpuAllocated, node.cpuTotal);
+    const memoryPct = percent(node.memoryAllocated, node.memoryTotal);
+
+    return `
+      <tr>
+        <td><strong>${escapeHtml(node.name)}</strong><br><small>${escapeHtml(node.hostname || node.address)}</small></td>
+        <td><span class="state ${stateClass(node.state)}">${escapeHtml(node.state)}</span></td>
+        <td>${escapeHtml(node.partition)}</td>
+        <td>
+          <div class="metric-cell">
+            <span>${number(node.cpuAllocated)} / ${number(node.cpuTotal)} cores</span>
+            <div class="bar-track"><div class="bar-fill" style="width: ${cpuPct}%"></div></div>
+          </div>
+        </td>
+        <td>
+          <div class="metric-cell">
+            <span>${memory(node.memoryAllocated)} / ${memory(node.memoryTotal)}</span>
+            <div class="bar-track"><div class="bar-fill" style="width: ${memoryPct}%"></div></div>
+          </div>
+        </td>
+        <td>${escapeHtml(node.gresUsed || node.gres)}</td>
+        <td>${escapeHtml(node.reason)}</td>
+      </tr>
+    `;
+  }).join("");
 }
 
 function renderPartitions(partitions) {
@@ -164,6 +224,7 @@ function render(data) {
   els.lastUpdated.textContent = new Date(data.generatedAt).toLocaleTimeString();
   setSummary(data.summary);
   renderQueue(data.activeJobs || []);
+  renderNodeResources(data.nodeResources || []);
   renderHistory(data.recentJobs || []);
   renderPartitions(data.partitions || []);
   renderNodeStates(data.nodes || { total: 0, byState: {} });
