@@ -15,11 +15,11 @@
           <span id="lastUpdated" class="pill">Waiting</span>
         </div>
 
-        <nav class="section-nav">
-          <a href="#overview">Overview</a>
-          <a href="#queue">Queue</a>
-          <a href="#nodes">Node Allocation</a>
-          <a href="#accounting">Accounting</a>
+        <nav class="section-nav" aria-label="Dashboard pages">
+          <button class="nav-button is-active" type="button" data-view-target="overview">Overview</button>
+          <button class="nav-button" type="button" data-view-target="queue">Queue</button>
+          <button class="nav-button" type="button" data-view-target="nodes">Node Allocation</button>
+          <button class="nav-button" type="button" data-view-target="accounting">Accounting</button>
         </nav>
 
         <div class="sidebar-controls">
@@ -35,7 +35,7 @@
       </aside>
 
       <main>
-        <section id="overview" class="section">
+        <section id="overview" class="view view-active" data-view="overview">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Overview</p>
@@ -58,7 +58,7 @@
           </div>
         </section>
 
-        <section id="queue" class="section panel table-panel">
+        <section id="queue" class="view panel table-panel" data-view="queue" hidden>
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Queue</p>
@@ -87,7 +87,7 @@
           </div>
         </section>
 
-        <section id="nodes" class="section panel table-panel">
+        <section id="nodes" class="view panel table-panel" data-view="nodes" hidden>
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Resources</p>
@@ -124,7 +124,7 @@
           </div>
         </section>
 
-        <section id="accounting" class="section panel table-panel">
+        <section id="accounting" class="view panel table-panel" data-view="accounting" hidden>
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Accounting</p>

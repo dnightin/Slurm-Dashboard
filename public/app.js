@@ -1,7 +1,8 @@
 const state = {
   data: null,
   timer: null,
-  query: ""
+  query: "",
+  view: "overview"
 };
 
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
@@ -24,7 +25,9 @@ const els = {
   clearSearchButton: document.querySelector("#clearSearchButton"),
   searchInput: document.querySelector("#searchInput"),
   queueCaption: document.querySelector("#queueCaption"),
-  historyCaption: document.querySelector("#historyCaption")
+  historyCaption: document.querySelector("#historyCaption"),
+  navButtons: Array.from(document.querySelectorAll("[data-view-target]")),
+  views: Array.from(document.querySelectorAll("[data-view]"))
 };
 
 function text(value, fallback = "n/a") {
@@ -64,6 +67,31 @@ function stateClass(value) {
 function matchesQuery(row) {
   if (!state.query) return true;
   return Object.values(row).join(" ").toLowerCase().includes(state.query);
+}
+
+function getInitialView() {
+  const view = window.location.hash.replace(/^#/, "");
+  return els.views.some((item) => item.dataset.view === view) ? view : "overview";
+}
+
+function setView(view, options = {}) {
+  state.view = els.views.some((item) => item.dataset.view === view) ? view : "overview";
+
+  for (const item of els.views) {
+    const isActive = item.dataset.view === state.view;
+    item.hidden = !isActive;
+    item.classList.toggle("view-active", isActive);
+  }
+
+  for (const button of els.navButtons) {
+    const isActive = button.dataset.viewTarget === state.view;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-current", isActive ? "page" : "false");
+  }
+
+  if (!options.skipHistory) {
+    window.history.replaceState(null, "", `#${state.view}`);
+  }
 }
 
 function setSummary(summary) {
@@ -202,6 +230,11 @@ els.searchInput.addEventListener("input", (event) => {
   state.query = event.target.value.trim().toLowerCase();
   if (state.data) render(state.data);
 });
+els.navButtons.forEach((button) => {
+  button.addEventListener("click", () => setView(button.dataset.viewTarget));
+});
+window.addEventListener("hashchange", () => setView(getInitialView(), { skipHistory: true }));
 
+setView(getInitialView(), { skipHistory: true });
 resetTimer();
 loadCluster();

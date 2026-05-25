@@ -93,9 +93,12 @@ main {
   padding: 24px clamp(16px, 3vw, 40px) 40px;
 }
 
-.section {
-  scroll-margin-top: 24px;
-  margin-bottom: 18px;
+.view {
+  min-height: calc(100vh - 48px);
+}
+
+.view[hidden] {
+  display: none;
 }
 
 .section-heading {
@@ -112,21 +115,25 @@ main {
   gap: 10px;
 }
 
-.section-nav a {
+.nav-button {
   display: flex;
   align-items: center;
+  width: 100%;
   min-height: 40px;
   padding: 0 12px;
   border: 1px solid transparent;
   border-radius: 6px;
   color: var(--ink);
+  background: transparent;
   font-size: 14px;
   font-weight: 800;
+  text-align: left;
   text-decoration: none;
 }
 
-.section-nav a:hover,
-.section-nav a:focus {
+.nav-button:hover,
+.nav-button:focus,
+.nav-button.is-active {
   border-color: var(--line);
   background: var(--surface-alt);
   outline: none;
@@ -255,7 +262,7 @@ button:hover {
 }
 
 .table-panel {
-  margin-bottom: 18px;
+  margin-bottom: 0;
 }
 
 .table-wrap {
