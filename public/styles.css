@@ -31,8 +31,7 @@ body {
 }
 
 button,
-input,
-select {
+input {
   font: inherit;
 }
 
@@ -141,8 +140,7 @@ main {
   justify-content: flex-end;
 }
 
-.search,
-.select {
+.search {
   display: grid;
   gap: 5px;
   color: var(--muted);
@@ -157,7 +155,6 @@ main {
 }
 
 input,
-select,
 button {
   height: 40px;
   border: 1px solid var(--line);
@@ -169,10 +166,6 @@ button {
 input {
   width: 100%;
   padding: 0 12px;
-}
-
-select {
-  padding: 0 34px 0 10px;
 }
 
 button {
@@ -470,7 +463,7 @@ tbody tr:hover {
   }
 
   .sidebar-controls {
-    grid-template-columns: minmax(220px, 1fr) 150px 120px;
+    grid-template-columns: minmax(220px, 1fr) 120px;
     align-items: end;
   }
 
@@ -481,9 +474,7 @@ tbody tr:hover {
 
 @media (max-width: 760px) {
   .search,
-  .select,
   input,
-  select,
   button {
     width: 100%;
   }

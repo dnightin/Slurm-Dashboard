@@ -4,6 +4,8 @@ const state = {
   query: ""
 };
 
+const IDLE_REFRESH_MS = 60 * 60 * 1000;
+
 const els = {
   clusterHost: document.querySelector("#clusterHost"),
   runningJobs: document.querySelector("#runningJobs"),
@@ -23,7 +25,6 @@ const els = {
   nodeResourceCaption: document.querySelector("#nodeResourceCaption"),
   refreshButton: document.querySelector("#refreshButton"),
   clearSearchButton: document.querySelector("#clearSearchButton"),
-  refreshSelect: document.querySelector("#refreshSelect"),
   searchInput: document.querySelector("#searchInput"),
   queueCaption: document.querySelector("#queueCaption"),
   historyCaption: document.querySelector("#historyCaption")
@@ -194,10 +195,7 @@ async function loadCluster() {
 
 function resetTimer() {
   if (state.timer) clearInterval(state.timer);
-  const interval = Number(els.refreshSelect.value);
-  if (interval > 0) {
-    state.timer = setInterval(loadCluster, interval);
-  }
+  state.timer = setInterval(loadCluster, IDLE_REFRESH_MS);
 }
 
 els.refreshButton.addEventListener("click", loadCluster);
@@ -206,7 +204,6 @@ els.clearSearchButton.addEventListener("click", () => {
   state.query = "";
   if (state.data) render(state.data);
 });
-els.refreshSelect.addEventListener("change", resetTimer);
 els.searchInput.addEventListener("input", (event) => {
   state.query = event.target.value.trim().toLowerCase();
   if (state.data) render(state.data);
