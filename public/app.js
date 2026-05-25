@@ -143,7 +143,7 @@ function renderNodeResources(nodes) {
     : `${number(nodes.length)} nodes from scontrol`;
 
   if (!rows.length) {
-    els.nodeResourceBody.innerHTML = `<tr><td colspan="7" class="empty">${state.query ? "No node allocation rows match the current search." : "No node allocation rows are available from scontrol."}</td></tr>`;
+    els.nodeResourceBody.innerHTML = `<tr><td colspan="4" class="empty">${state.query ? "No node allocation rows match the current search." : "No node allocation rows are available from scontrol."}</td></tr>`;
     return;
   }
 
@@ -155,7 +155,6 @@ function renderNodeResources(nodes) {
       <tr>
         <td><strong>${escapeHtml(node.name)}</strong><br><small>${escapeHtml(node.hostname || node.address)}</small></td>
         <td><span class="state ${stateClass(node.state)}">${escapeHtml(node.state)}</span></td>
-        <td>${escapeHtml(node.partition)}</td>
         <td>
           <div class="metric-cell">
             <span>${number(node.cpuAllocated)} / ${number(node.cpuTotal)} cores</span>
@@ -168,8 +167,6 @@ function renderNodeResources(nodes) {
             <div class="bar-track"><div class="bar-fill" style="width: ${memoryPct}%"></div></div>
           </div>
         </td>
-        <td>${escapeHtml(node.gresUsed || node.gres)}</td>
-        <td>${escapeHtml(node.reason)}</td>
       </tr>
     `;
   }).join("");
