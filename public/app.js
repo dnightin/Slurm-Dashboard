@@ -1,30 +1,66 @@
 const state = {
   data: null,
   timer: null,
-  query: "",
-  view: "queue"
+  view: "queue",
+  filters: {
+    queue: "all",
+    nodes: "all",
+    accounting: "all"
+  },
+  queries: {
+    queue: "",
+    nodes: "",
+    accounting: ""
+  },
+  sorts: {
+    queue: { key: "state", direction: "asc" },
+    nodes: { key: "name", direction: "asc" },
+    accounting: { key: "submit", direction: "desc" }
+  }
 };
 
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
 
 const els = {
   clusterHost: document.querySelector("#clusterHost"),
+  lastUpdated: document.querySelector("#lastUpdated"),
+  freshnessLabels: Array.from(document.querySelectorAll("[data-freshness]")),
+  refreshButtons: Array.from(document.querySelectorAll("[data-refresh]")),
+  navButtons: Array.from(document.querySelectorAll("[data-view-target]")),
+  views: Array.from(document.querySelectorAll("[data-view]")),
+  filterButtons: Array.from(document.querySelectorAll("[data-filter-group]")),
+  sortButtons: Array.from(document.querySelectorAll("[data-sort-table]")),
+
+  queueSearchInput: document.querySelector("#queueSearchInput"),
+  nodeSearchInput: document.querySelector("#nodeSearchInput"),
+  accountingSearchInput: document.querySelector("#accountingSearchInput"),
+
+  queueCaption: document.querySelector("#queueCaption"),
+  queueBody: document.querySelector("#queueBody"),
+  queueRunning: document.querySelector("#queueRunning"),
+  queuePending: document.querySelector("#queuePending"),
+  queueBlocked: document.querySelector("#queueBlocked"),
+  queueTotal: document.querySelector("#queueTotal"),
+  queueCommandAlert: document.querySelector("#queueCommandAlert"),
+
+  nodeResourceCaption: document.querySelector("#nodeResourceCaption"),
+  nodeResourceBody: document.querySelector("#nodeResourceBody"),
+  nodeGrid: document.querySelector("#nodeGrid"),
   cpuAllocation: document.querySelector("#cpuAllocation"),
   cpuAllocationBar: document.querySelector("#cpuAllocationBar"),
   memoryAllocation: document.querySelector("#memoryAllocation"),
   memoryAllocationBar: document.querySelector("#memoryAllocationBar"),
-  lastUpdated: document.querySelector("#lastUpdated"),
-  queueBody: document.querySelector("#queueBody"),
-  historyBody: document.querySelector("#historyBody"),
-  nodeResourceBody: document.querySelector("#nodeResourceBody"),
-  nodeResourceCaption: document.querySelector("#nodeResourceCaption"),
-  refreshButton: document.querySelector("#refreshButton"),
-  clearSearchButton: document.querySelector("#clearSearchButton"),
-  searchInput: document.querySelector("#searchInput"),
-  queueCaption: document.querySelector("#queueCaption"),
+  nodeTotal: document.querySelector("#nodeTotal"),
+  nodeUnavailable: document.querySelector("#nodeUnavailable"),
+  nodeCommandAlert: document.querySelector("#nodeCommandAlert"),
+
   historyCaption: document.querySelector("#historyCaption"),
-  navButtons: Array.from(document.querySelectorAll("[data-view-target]")),
-  views: Array.from(document.querySelectorAll("[data-view]"))
+  historyBody: document.querySelector("#historyBody"),
+  accountingCompleted: document.querySelector("#accountingCompleted"),
+  accountingFailed: document.querySelector("#accountingFailed"),
+  accountingCancelled: document.querySelector("#accountingCancelled"),
+  accountingTotal: document.querySelector("#accountingTotal"),
+  accountingCommandAlert: document.querySelector("#accountingCommandAlert")
 };
 
 function text(value, fallback = "n/a") {
@@ -61,9 +97,52 @@ function stateClass(value) {
   return text(value, "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function matchesQuery(row) {
-  if (!state.query) return true;
-  return Object.values(row).join(" ").toLowerCase().includes(state.query);
+function normalizedState(value) {
+  return stateClass(value);
+}
+
+function rowMatchesQuery(row, query) {
+  if (!query) return true;
+  return Object.values(row).join(" ").toLowerCase().includes(query);
+}
+
+function queueGroup(job) {
+  const normalized = normalizedState(job.state);
+  if (normalized.includes("run")) return "running";
+  if (normalized.includes("pend")) return "pending";
+  if (["held", "hold", "suspended", "stopped", "blocked"].some((part) => normalized.includes(part))) return "blocked";
+  if (text(job.reason, "").match(/dependency|priority|resources|assoc|qos|license|partition/i)) return "blocked";
+  return normalized || "unknown";
+}
+
+function nodeGroup(node) {
+  const normalized = normalizedState(node.state);
+  if (normalized.includes("idle")) return "idle";
+  if (normalized.includes("mix")) return "mixed";
+  if (normalized.includes("alloc")) return "allocated";
+  if (["down", "drain", "fail", "maint", "unknown"].some((part) => normalized.includes(part))) return "down";
+  return normalized || "unknown";
+}
+
+function accountingGroup(job) {
+  const normalized = normalizedState(job.state);
+  if (normalized.includes("complete")) return "completed";
+  if (normalized.includes("cancel")) return "cancelled";
+  if (["fail", "timeout", "nodefail", "oom", "deadline"].some((part) => normalized.includes(part))) return "failed";
+  return normalized || "unknown";
+}
+
+function compareValues(a, b) {
+  const aNumber = Number(a);
+  const bNumber = Number(b);
+  if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) return aNumber - bNumber;
+  return String(a || "").localeCompare(String(b || ""), undefined, { numeric: true, sensitivity: "base" });
+}
+
+function sortedRows(rows, table) {
+  const { key, direction } = state.sorts[table];
+  const multiplier = direction === "asc" ? 1 : -1;
+  return [...rows].sort((a, b) => compareValues(a[key], b[key]) * multiplier);
 }
 
 function getInitialView() {
@@ -91,23 +170,62 @@ function setView(view, options = {}) {
   }
 }
 
-function renderResourceSummary(summary) {
+function setFreshness(generatedAt) {
+  const label = generatedAt ? `Updated ${new Date(generatedAt).toLocaleTimeString()}` : "Waiting";
+  els.lastUpdated.textContent = label;
+  for (const item of els.freshnessLabels) item.textContent = label;
+}
+
+function renderCommandAlert(element, command, label) {
+  if (!command || command.ok) {
+    element.hidden = true;
+    element.textContent = "";
+    return;
+  }
+
+  element.hidden = false;
+  element.textContent = `${label} is unavailable: ${command.error || "command failed"}`;
+}
+
+function renderQueueSummary(jobs) {
+  els.queueRunning.textContent = number(jobs.filter((job) => queueGroup(job) === "running").length);
+  els.queuePending.textContent = number(jobs.filter((job) => queueGroup(job) === "pending").length);
+  els.queueBlocked.textContent = number(jobs.filter((job) => queueGroup(job) === "blocked").length);
+  els.queueTotal.textContent = number(jobs.length);
+}
+
+function renderResourceSummary(summary, nodes) {
   const cpuPct = percent(summary.allocatedCpus, summary.totalCpus);
   const memoryPct = percent(summary.allocatedMemoryMb, summary.totalMemoryMb);
   els.cpuAllocation.textContent = `${number(summary.allocatedCpus)} / ${number(summary.totalCpus)} cores (${cpuPct}%)`;
   els.cpuAllocationBar.style.width = `${cpuPct}%`;
   els.memoryAllocation.textContent = `${memory(summary.allocatedMemoryMb)} / ${memory(summary.totalMemoryMb)} (${memoryPct}%)`;
   els.memoryAllocationBar.style.width = `${memoryPct}%`;
+  els.nodeTotal.textContent = number(nodes.length);
+  els.nodeUnavailable.textContent = number(nodes.filter((node) => nodeGroup(node) === "down").length);
+}
+
+function renderAccountingSummary(jobs) {
+  els.accountingCompleted.textContent = number(jobs.filter((job) => accountingGroup(job) === "completed").length);
+  els.accountingFailed.textContent = number(jobs.filter((job) => accountingGroup(job) === "failed").length);
+  els.accountingCancelled.textContent = number(jobs.filter((job) => accountingGroup(job) === "cancelled").length);
+  els.accountingTotal.textContent = number(jobs.length);
 }
 
 function renderQueue(jobs) {
-  const rows = jobs.filter(matchesQuery);
-  els.queueCaption.textContent = state.query
-    ? `${number(rows.length)} of ${number(jobs.length)} active jobs match the current search`
+  const query = state.queries.queue;
+  const filter = state.filters.queue;
+  const filtered = jobs
+    .filter((job) => filter === "all" || queueGroup(job) === filter)
+    .filter((job) => rowMatchesQuery(job, query));
+  const rows = sortedRows(filtered, "queue");
+
+  els.queueCaption.textContent = query || filter !== "all"
+    ? `${number(rows.length)} of ${number(jobs.length)} active jobs match this view`
     : `${number(jobs.length)} active jobs from squeue`;
 
   if (!rows.length) {
-    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">${state.query ? "No active jobs match the current search." : "No active jobs are currently queued."}</td></tr>`;
+    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">${jobs.length ? "No active jobs match this view." : "No active jobs are currently queued."}</td></tr>`;
     return;
   }
 
@@ -125,39 +243,48 @@ function renderQueue(jobs) {
   `).join("");
 }
 
-function renderHistory(jobs) {
-  const rows = jobs.filter(matchesQuery).slice(0, 250);
-  els.historyCaption.textContent = state.query
-    ? `${number(rows.length)} of ${number(jobs.length)} recent jobs match the current search`
-    : `${number(jobs.length)} recent jobs from sacct`;
-
+function renderNodeGrid(rows) {
   if (!rows.length) {
-    els.historyBody.innerHTML = `<tr><td colspan="8" class="empty">${state.query ? "No recent accounting rows match the current search." : "No recent accounting rows are available."}</td></tr>`;
+    els.nodeGrid.innerHTML = `<div class="empty">No nodes match this view.</div>`;
     return;
   }
 
-  els.historyBody.innerHTML = rows.map((job) => `
-    <tr>
-      <td><strong>${escapeHtml(job.jobId)}</strong><br><small>${escapeHtml(job.name)}</small></td>
-      <td>${escapeHtml(job.user)}</td>
-      <td><span class="state ${stateClass(job.state)}">${escapeHtml(job.state)}</span></td>
-      <td>${escapeHtml(job.partition)}</td>
-      <td>${escapeHtml(job.elapsed)}</td>
-      <td>${escapeHtml(job.totalCpu)}</td>
-      <td>${escapeHtml(job.submit)}</td>
-      <td>${escapeHtml(job.exitCode)}</td>
-    </tr>
-  `).join("");
+  els.nodeGrid.innerHTML = rows.map((node) => {
+    const cpuPct = percent(node.cpuAllocated, node.cpuTotal);
+    const memoryPct = percent(node.memoryAllocated, node.memoryTotal);
+    return `
+      <article class="node-card node-${nodeGroup(node)}">
+        <header>
+          <strong>${escapeHtml(node.name)}</strong>
+          <span class="state ${stateClass(node.state)}">${escapeHtml(node.state)}</span>
+        </header>
+        <div class="node-metrics">
+          <span>CPU ${number(node.cpuAllocated)} / ${number(node.cpuTotal)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: ${cpuPct}%"></div></div>
+          <span>Mem ${memory(node.memoryAllocated)} / ${memory(node.memoryTotal)}</span>
+          <div class="bar-track"><div class="bar-fill" style="width: ${memoryPct}%"></div></div>
+        </div>
+      </article>
+    `;
+  }).join("");
 }
 
 function renderNodeResources(nodes) {
-  const rows = nodes.filter(matchesQuery);
-  els.nodeResourceCaption.textContent = state.query
-    ? `${number(rows.length)} of ${number(nodes.length)} nodes match the current search`
+  const query = state.queries.nodes;
+  const filter = state.filters.nodes;
+  const filtered = nodes
+    .filter((node) => filter === "all" || nodeGroup(node) === filter)
+    .filter((node) => rowMatchesQuery(node, query));
+  const rows = sortedRows(filtered, "nodes");
+
+  els.nodeResourceCaption.textContent = query || filter !== "all"
+    ? `${number(rows.length)} of ${number(nodes.length)} nodes match this view`
     : `${number(nodes.length)} nodes from scontrol`;
 
+  renderNodeGrid(rows);
+
   if (!rows.length) {
-    els.nodeResourceBody.innerHTML = `<tr><td colspan="4" class="empty">${state.query ? "No node allocation rows match the current search." : "No node allocation rows are available from scontrol."}</td></tr>`;
+    els.nodeResourceBody.innerHTML = `<tr><td colspan="4" class="empty">${nodes.length ? "No node allocation rows match this view." : "No node allocation rows are available from scontrol."}</td></tr>`;
     return;
   }
 
@@ -186,18 +313,60 @@ function renderNodeResources(nodes) {
   }).join("");
 }
 
+function renderHistory(jobs) {
+  const query = state.queries.accounting;
+  const filter = state.filters.accounting;
+  const filtered = jobs
+    .filter((job) => filter === "all" || accountingGroup(job) === filter)
+    .filter((job) => rowMatchesQuery(job, query));
+  const rows = sortedRows(filtered, "accounting").slice(0, 250);
+
+  els.historyCaption.textContent = query || filter !== "all"
+    ? `${number(rows.length)} of ${number(jobs.length)} recent jobs match this view`
+    : `${number(jobs.length)} recent jobs from sacct`;
+
+  if (!rows.length) {
+    els.historyBody.innerHTML = `<tr><td colspan="8" class="empty">${jobs.length ? "No recent accounting rows match this view." : "No recent accounting rows are available."}</td></tr>`;
+    return;
+  }
+
+  els.historyBody.innerHTML = rows.map((job) => `
+    <tr>
+      <td><strong>${escapeHtml(job.jobId)}</strong><br><small>${escapeHtml(job.name)}</small></td>
+      <td>${escapeHtml(job.user)}</td>
+      <td><span class="state ${stateClass(job.state)}">${escapeHtml(job.state)}</span></td>
+      <td>${escapeHtml(job.partition)}</td>
+      <td>${escapeHtml(job.elapsed)}</td>
+      <td>${escapeHtml(job.totalCpu)}</td>
+      <td>${escapeHtml(job.submit)}</td>
+      <td>${escapeHtml(job.exitCode)}</td>
+    </tr>
+  `).join("");
+}
+
 function render(data) {
+  const activeJobs = data.activeJobs || [];
+  const nodes = data.nodeResources || [];
+  const recentJobs = data.recentJobs || [];
+
   state.data = data;
   els.clusterHost.textContent = data.host || "Cluster";
-  els.lastUpdated.textContent = new Date(data.generatedAt).toLocaleTimeString();
-  renderResourceSummary(data.summary);
-  renderQueue(data.activeJobs || []);
-  renderNodeResources(data.nodeResources || []);
-  renderHistory(data.recentJobs || []);
+  setFreshness(data.generatedAt);
+  renderCommandAlert(els.queueCommandAlert, data.commands && data.commands.squeue, "squeue");
+  renderCommandAlert(els.nodeCommandAlert, data.commands && data.commands.scontrol, "scontrol");
+  renderCommandAlert(els.accountingCommandAlert, data.commands && data.commands.sacct, "sacct");
+  renderQueueSummary(activeJobs);
+  renderResourceSummary(data.summary || {}, nodes);
+  renderAccountingSummary(recentJobs);
+  renderQueue(activeJobs);
+  renderNodeResources(nodes);
+  renderHistory(recentJobs);
 }
 
 async function loadCluster() {
+  setFreshness(null);
   els.lastUpdated.textContent = "Refreshing";
+  for (const item of els.freshnessLabels) item.textContent = "Refreshing";
 
   try {
     const response = await fetch("/api/cluster", { cache: "no-store" });
@@ -205,7 +374,9 @@ async function loadCluster() {
     render(await response.json());
   } catch (error) {
     els.lastUpdated.textContent = "Error";
-    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">${escapeHtml(error.message)}</td></tr>`;
+    for (const item of els.freshnessLabels) item.textContent = "Error";
+    els.queueCommandAlert.hidden = false;
+    els.queueCommandAlert.textContent = error.message;
   }
 }
 
@@ -214,15 +385,48 @@ function resetTimer() {
   state.timer = setInterval(loadCluster, IDLE_REFRESH_MS);
 }
 
-els.refreshButton.addEventListener("click", loadCluster);
-els.clearSearchButton.addEventListener("click", () => {
-  els.searchInput.value = "";
-  state.query = "";
+function refreshCurrentData() {
   if (state.data) render(state.data);
+}
+
+function updateFilterButtons(group) {
+  for (const button of els.filterButtons.filter((item) => item.dataset.filterGroup === group)) {
+    button.classList.toggle("is-active", button.dataset.filterValue === state.filters[group]);
+  }
+}
+
+els.refreshButtons.forEach((button) => button.addEventListener("click", loadCluster));
+els.queueSearchInput.addEventListener("input", (event) => {
+  state.queries.queue = event.target.value.trim().toLowerCase();
+  refreshCurrentData();
 });
-els.searchInput.addEventListener("input", (event) => {
-  state.query = event.target.value.trim().toLowerCase();
-  if (state.data) render(state.data);
+els.nodeSearchInput.addEventListener("input", (event) => {
+  state.queries.nodes = event.target.value.trim().toLowerCase();
+  refreshCurrentData();
+});
+els.accountingSearchInput.addEventListener("input", (event) => {
+  state.queries.accounting = event.target.value.trim().toLowerCase();
+  refreshCurrentData();
+});
+els.filterButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const group = button.dataset.filterGroup;
+    state.filters[group] = button.dataset.filterValue;
+    updateFilterButtons(group);
+    refreshCurrentData();
+  });
+});
+els.sortButtons.forEach((button) => {
+  button.addEventListener("click", () => {
+    const table = button.dataset.sortTable;
+    const key = button.dataset.sortKey;
+    const current = state.sorts[table];
+    state.sorts[table] = {
+      key,
+      direction: current.key === key && current.direction === "asc" ? "desc" : "asc"
+    };
+    refreshCurrentData();
+  });
 });
 els.navButtons.forEach((button) => {
   button.addEventListener("click", () => setView(button.dataset.viewTarget));

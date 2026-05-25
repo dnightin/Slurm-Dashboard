@@ -20,115 +20,181 @@
           <button class="nav-button" type="button" data-view-target="nodes">Node Allocation</button>
           <button class="nav-button" type="button" data-view-target="accounting">Accounting</button>
         </nav>
-
-        <div class="sidebar-controls">
-          <label class="search">
-            <span>Search</span>
-            <span class="search-row">
-              <input id="searchInput" type="search" placeholder="job, user, node">
-              <button id="clearSearchButton" class="icon-button" type="button" title="Clear search" aria-label="Clear search">x</button>
-            </span>
-          </label>
-          <button id="refreshButton" type="button">Refresh</button>
-        </div>
       </aside>
 
       <main>
-        <section id="queue" class="view view-active panel table-panel" data-view="queue">
-          <div class="panel-heading">
+        <section id="queue" class="view view-active" data-view="queue">
+          <div class="page-heading">
             <div>
               <p class="eyebrow">Queue</p>
               <h2>Active Jobs</h2>
               <p id="queueCaption">Active jobs from squeue</p>
             </div>
+            <div class="heading-actions">
+              <span class="freshness" data-freshness>Waiting</span>
+              <button class="refresh-button" type="button" data-refresh>Refresh</button>
+            </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>User</th>
-                  <th>State</th>
-                  <th>Partition</th>
-                  <th>Time</th>
-                  <th>CPUs</th>
-                  <th>Nodes</th>
-                  <th>Reason / Node List</th>
-                </tr>
-              </thead>
-              <tbody id="queueBody">
-                <tr><td colspan="8" class="empty">Loading queue data...</td></tr>
-              </tbody>
-            </table>
+
+          <div id="queueCommandAlert" class="alert" hidden></div>
+
+          <div class="summary-strip" aria-label="Queue summary">
+            <article class="summary-card"><span>Running</span><strong id="queueRunning">0</strong></article>
+            <article class="summary-card"><span>Pending</span><strong id="queuePending">0</strong></article>
+            <article class="summary-card"><span>Blocked</span><strong id="queueBlocked">0</strong></article>
+            <article class="summary-card"><span>Total</span><strong id="queueTotal">0</strong></article>
+          </div>
+
+          <div class="panel controls-panel">
+            <label class="field">
+              <span>Search Queue</span>
+              <input id="queueSearchInput" type="search" placeholder="job, user, partition">
+            </label>
+            <div class="filter-group" aria-label="Queue state filters">
+              <button class="filter-chip is-active" type="button" data-filter-group="queue" data-filter-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter-group="queue" data-filter-value="running">Running</button>
+              <button class="filter-chip" type="button" data-filter-group="queue" data-filter-value="pending">Pending</button>
+              <button class="filter-chip" type="button" data-filter-group="queue" data-filter-value="blocked">Blocked</button>
+            </div>
+          </div>
+
+          <div class="panel table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="jobId">Job</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="user">User</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="state">State</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="partition">Partition</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="time">Time</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="cpus">CPUs</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="queue" data-sort-key="nodes">Nodes</button></th>
+                    <th>Reason / Node List</th>
+                  </tr>
+                </thead>
+                <tbody id="queueBody">
+                  <tr><td colspan="8" class="empty">Loading queue data...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
-        <section id="nodes" class="view panel table-panel" data-view="nodes" hidden>
-          <div class="panel-heading">
+        <section id="nodes" class="view" data-view="nodes" hidden>
+          <div class="page-heading">
             <div>
               <p class="eyebrow">Resources</p>
-              <h2>Per-Node Allocation</h2>
+              <h2>Node Allocation</h2>
               <p id="nodeResourceCaption">CPU and memory allocation from scontrol</p>
             </div>
-          </div>
-          <div class="resource-summary">
-            <div>
-              <span>CPU Allocation</span>
-              <strong id="cpuAllocation">0 / 0</strong>
-              <div class="bar-track"><div id="cpuAllocationBar" class="bar-fill"></div></div>
-            </div>
-            <div>
-              <span>Memory Allocation</span>
-              <strong id="memoryAllocation">0 / 0</strong>
-              <div class="bar-track"><div id="memoryAllocationBar" class="bar-fill"></div></div>
+            <div class="heading-actions">
+              <span class="freshness" data-freshness>Waiting</span>
+              <button class="refresh-button" type="button" data-refresh>Refresh</button>
             </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Node</th>
-                  <th>State</th>
-                  <th>CPU</th>
-                  <th>Memory</th>
-                </tr>
-              </thead>
-              <tbody id="nodeResourceBody">
-                <tr><td colspan="4" class="empty">Loading node allocation data...</td></tr>
-              </tbody>
-            </table>
+
+          <div id="nodeCommandAlert" class="alert" hidden></div>
+
+          <div class="summary-strip" aria-label="Node summary">
+            <article class="summary-card"><span>CPU Allocation</span><strong id="cpuAllocation">0 / 0</strong><div class="bar-track"><div id="cpuAllocationBar" class="bar-fill"></div></div></article>
+            <article class="summary-card"><span>Memory Allocation</span><strong id="memoryAllocation">0 / 0</strong><div class="bar-track"><div id="memoryAllocationBar" class="bar-fill"></div></div></article>
+            <article class="summary-card"><span>Nodes</span><strong id="nodeTotal">0</strong></article>
+            <article class="summary-card"><span>Unavailable</span><strong id="nodeUnavailable">0</strong></article>
+          </div>
+
+          <div class="panel controls-panel">
+            <label class="field">
+              <span>Search Nodes</span>
+              <input id="nodeSearchInput" type="search" placeholder="node, state">
+            </label>
+            <div class="filter-group" aria-label="Node state filters">
+              <button class="filter-chip is-active" type="button" data-filter-group="nodes" data-filter-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter-group="nodes" data-filter-value="idle">Idle</button>
+              <button class="filter-chip" type="button" data-filter-group="nodes" data-filter-value="mixed">Mixed</button>
+              <button class="filter-chip" type="button" data-filter-group="nodes" data-filter-value="allocated">Allocated</button>
+              <button class="filter-chip" type="button" data-filter-group="nodes" data-filter-value="down">Down</button>
+            </div>
+          </div>
+
+          <div id="nodeGrid" class="node-grid" aria-label="Node allocation grid"></div>
+
+          <div class="panel table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button type="button" class="sort-button" data-sort-table="nodes" data-sort-key="name">Node</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="nodes" data-sort-key="state">State</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="nodes" data-sort-key="cpuAllocated">CPU</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="nodes" data-sort-key="memoryAllocated">Memory</button></th>
+                  </tr>
+                </thead>
+                <tbody id="nodeResourceBody">
+                  <tr><td colspan="4" class="empty">Loading node allocation data...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
 
-        <section id="accounting" class="view panel table-panel" data-view="accounting" hidden>
-          <div class="panel-heading">
+        <section id="accounting" class="view" data-view="accounting" hidden>
+          <div class="page-heading">
             <div>
               <p class="eyebrow">Accounting</p>
               <h2>Recent Jobs</h2>
               <p id="historyCaption">Recent jobs from sacct</p>
             </div>
+            <div class="heading-actions">
+              <span class="freshness" data-freshness>Waiting</span>
+              <button class="refresh-button" type="button" data-refresh>Refresh</button>
+            </div>
           </div>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Job</th>
-                  <th>User</th>
-                  <th>State</th>
-                  <th>Partition</th>
-                  <th>Elapsed</th>
-                  <th>CPU</th>
-                  <th>Submitted</th>
-                  <th>Exit</th>
-                </tr>
-              </thead>
-              <tbody id="historyBody">
-                <tr><td colspan="8" class="empty">Loading accounting data...</td></tr>
-              </tbody>
-            </table>
+
+          <div id="accountingCommandAlert" class="alert" hidden></div>
+
+          <div class="summary-strip" aria-label="Accounting summary">
+            <article class="summary-card"><span>Completed</span><strong id="accountingCompleted">0</strong></article>
+            <article class="summary-card"><span>Failed</span><strong id="accountingFailed">0</strong></article>
+            <article class="summary-card"><span>Cancelled</span><strong id="accountingCancelled">0</strong></article>
+            <article class="summary-card"><span>Total Recent</span><strong id="accountingTotal">0</strong></article>
+          </div>
+
+          <div class="panel controls-panel">
+            <label class="field">
+              <span>Search Accounting</span>
+              <input id="accountingSearchInput" type="search" placeholder="job, user, partition">
+            </label>
+            <div class="filter-group" aria-label="Accounting state filters">
+              <button class="filter-chip is-active" type="button" data-filter-group="accounting" data-filter-value="all">All</button>
+              <button class="filter-chip" type="button" data-filter-group="accounting" data-filter-value="completed">Completed</button>
+              <button class="filter-chip" type="button" data-filter-group="accounting" data-filter-value="failed">Failed</button>
+              <button class="filter-chip" type="button" data-filter-group="accounting" data-filter-value="cancelled">Cancelled</button>
+            </div>
+          </div>
+
+          <div class="panel table-panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="jobId">Job</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="user">User</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="state">State</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="partition">Partition</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="elapsed">Elapsed</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="totalCpu">CPU</button></th>
+                    <th><button type="button" class="sort-button" data-sort-table="accounting" data-sort-key="submit">Submitted</button></th>
+                    <th>Exit</th>
+                  </tr>
+                </thead>
+                <tbody id="historyBody">
+                  <tr><td colspan="8" class="empty">Loading accounting data...</td></tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </section>
-
       </main>
     </div>
 
