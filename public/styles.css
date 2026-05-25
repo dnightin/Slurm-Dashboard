@@ -227,13 +227,6 @@ button:hover {
   line-height: 1;
 }
 
-.grid-section {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-
 .panel {
   min-width: 0;
   overflow: hidden;
@@ -322,10 +315,6 @@ tbody tr:hover {
   display: grid;
   gap: 10px;
   padding: 14px;
-}
-
-.command-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .list-item {
@@ -502,8 +491,6 @@ tbody tr:hover {
   .section-nav,
   .sidebar-controls,
   .stats-grid,
-  .grid-section,
-  .command-grid,
   .resource-summary {
     grid-template-columns: 1fr;
   }

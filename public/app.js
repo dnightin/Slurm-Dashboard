@@ -21,9 +21,6 @@ const els = {
   historyBody: document.querySelector("#historyBody"),
   nodeResourceBody: document.querySelector("#nodeResourceBody"),
   nodeResourceCaption: document.querySelector("#nodeResourceCaption"),
-  partitionList: document.querySelector("#partitionList"),
-  nodeStates: document.querySelector("#nodeStates"),
-  commandHealth: document.querySelector("#commandHealth"),
   refreshButton: document.querySelector("#refreshButton"),
   clearSearchButton: document.querySelector("#clearSearchButton"),
   refreshSelect: document.querySelector("#refreshSelect"),
@@ -172,56 +169,6 @@ function renderNodeResources(nodes) {
   }).join("");
 }
 
-function renderPartitions(partitions) {
-  if (!partitions.length) {
-    els.partitionList.innerHTML = `<div class="empty">No partition data available.</div>`;
-    return;
-  }
-
-  els.partitionList.innerHTML = partitions.map((partition) => `
-    <article class="list-item">
-      <header>
-        <span>${escapeHtml(text(partition.partition).replace("*", ""))}</span>
-        <span class="pill">${escapeHtml(text(partition.nodes, "0"))} nodes</span>
-      </header>
-      <small>${escapeHtml(partition.state)} · ${escapeHtml(partition.availability)} · limit ${escapeHtml(partition.timeLimit)}</small>
-      <small>${escapeHtml(partition.nodeList)}</small>
-    </article>
-  `).join("");
-}
-
-function renderNodeStates(nodes) {
-  const entries = Object.entries(nodes.byState || {}).sort((a, b) => b[1] - a[1]);
-
-  if (!entries.length) {
-    els.nodeStates.innerHTML = `<div class="empty">No node state data available.</div>`;
-    return;
-  }
-
-  els.nodeStates.innerHTML = entries.map(([name, count]) => {
-    const percent = nodes.total ? Math.round((count / nodes.total) * 100) : 0;
-    return `
-      <div class="bar-row">
-        <div class="bar-label"><span>${escapeHtml(name)}</span><span>${number(count)} (${percent}%)</span></div>
-        <div class="bar-track"><div class="bar-fill" style="width: ${percent}%"></div></div>
-      </div>
-    `;
-  }).join("");
-}
-
-function renderCommands(commands) {
-  els.commandHealth.innerHTML = Object.entries(commands).map(([name, command]) => `
-    <article class="list-item">
-      <header>
-        <span class="status"><span class="dot ${command.ok ? "good" : "bad"}"></span>${escapeHtml(name)}</span>
-        <span class="pill">${number(command.durationMs)}ms</span>
-      </header>
-      <small>${escapeHtml(command.command)}</small>
-      ${command.error ? `<small>${escapeHtml(command.error)}</small>` : ""}
-    </article>
-  `).join("");
-}
-
 function render(data) {
   state.data = data;
   els.clusterHost.textContent = data.host || "Cluster";
@@ -230,9 +177,6 @@ function render(data) {
   renderQueue(data.activeJobs || []);
   renderNodeResources(data.nodeResources || []);
   renderHistory(data.recentJobs || []);
-  renderPartitions(data.partitions || []);
-  renderNodeStates(data.nodes || { total: 0, byState: {} });
-  renderCommands(data.commands || {});
 }
 
 async function loadCluster() {
@@ -244,12 +188,7 @@ async function loadCluster() {
     render(await response.json());
   } catch (error) {
     els.lastUpdated.textContent = "Error";
-    els.commandHealth.innerHTML = `
-      <article class="list-item">
-        <header><span class="status"><span class="dot bad"></span>dashboard</span></header>
-        <small>${escapeHtml(error.message)}</small>
-      </article>
-    `;
+    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">${escapeHtml(error.message)}</td></tr>`;
   }
 }
 
