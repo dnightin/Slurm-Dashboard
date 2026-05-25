@@ -10,9 +10,6 @@ const els = {
   clusterHost: document.querySelector("#clusterHost"),
   runningJobs: document.querySelector("#runningJobs"),
   pendingJobs: document.querySelector("#pendingJobs"),
-  activeJobs: document.querySelector("#activeJobs"),
-  recentJobs: document.querySelector("#recentJobs"),
-  activeUsers: document.querySelector("#activeUsers"),
   totalNodes: document.querySelector("#totalNodes"),
   cpuAllocation: document.querySelector("#cpuAllocation"),
   cpuAllocationBar: document.querySelector("#cpuAllocationBar"),
@@ -72,9 +69,6 @@ function matchesQuery(row) {
 function setSummary(summary) {
   els.runningJobs.textContent = number(summary.runningJobs);
   els.pendingJobs.textContent = number(summary.pendingJobs);
-  els.activeJobs.textContent = number(summary.activeJobs);
-  els.recentJobs.textContent = number(summary.recentJobs);
-  els.activeUsers.textContent = number(summary.activeUsers);
   els.totalNodes.textContent = number(summary.totalNodes);
   const cpuPct = percent(summary.allocatedCpus, summary.totalCpus);
   const memoryPct = percent(summary.allocatedMemoryMb, summary.totalMemoryMb);
