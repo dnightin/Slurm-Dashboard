@@ -16,8 +16,7 @@
         </div>
 
         <nav class="section-nav" aria-label="Dashboard pages">
-          <button class="nav-button is-active" type="button" data-view-target="overview">Overview</button>
-          <button class="nav-button" type="button" data-view-target="queue">Queue</button>
+          <button class="nav-button is-active" type="button" data-view-target="queue">Queue</button>
           <button class="nav-button" type="button" data-view-target="nodes">Node Allocation</button>
           <button class="nav-button" type="button" data-view-target="accounting">Accounting</button>
         </nav>
@@ -35,30 +34,7 @@
       </aside>
 
       <main>
-        <section id="overview" class="view view-active" data-view="overview">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Overview</p>
-              <h2>Cluster Summary</h2>
-            </div>
-          </div>
-          <div class="stats-grid" aria-label="Cluster summary">
-            <article class="stat">
-              <span>Running</span>
-              <strong id="runningJobs">0</strong>
-            </article>
-            <article class="stat">
-              <span>Pending</span>
-              <strong id="pendingJobs">0</strong>
-            </article>
-            <article class="stat">
-              <span>Nodes</span>
-              <strong id="totalNodes">0</strong>
-            </article>
-          </div>
-        </section>
-
-        <section id="queue" class="view panel table-panel" data-view="queue" hidden>
+        <section id="queue" class="view view-active panel table-panel" data-view="queue">
           <div class="panel-heading">
             <div>
               <p class="eyebrow">Queue</p>

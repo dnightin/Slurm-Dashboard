@@ -2,16 +2,13 @@ const state = {
   data: null,
   timer: null,
   query: "",
-  view: "overview"
+  view: "queue"
 };
 
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
 
 const els = {
   clusterHost: document.querySelector("#clusterHost"),
-  runningJobs: document.querySelector("#runningJobs"),
-  pendingJobs: document.querySelector("#pendingJobs"),
-  totalNodes: document.querySelector("#totalNodes"),
   cpuAllocation: document.querySelector("#cpuAllocation"),
   cpuAllocationBar: document.querySelector("#cpuAllocationBar"),
   memoryAllocation: document.querySelector("#memoryAllocation"),
@@ -71,11 +68,11 @@ function matchesQuery(row) {
 
 function getInitialView() {
   const view = window.location.hash.replace(/^#/, "");
-  return els.views.some((item) => item.dataset.view === view) ? view : "overview";
+  return els.views.some((item) => item.dataset.view === view) ? view : "queue";
 }
 
 function setView(view, options = {}) {
-  state.view = els.views.some((item) => item.dataset.view === view) ? view : "overview";
+  state.view = els.views.some((item) => item.dataset.view === view) ? view : "queue";
 
   for (const item of els.views) {
     const isActive = item.dataset.view === state.view;
@@ -94,10 +91,7 @@ function setView(view, options = {}) {
   }
 }
 
-function setSummary(summary) {
-  els.runningJobs.textContent = number(summary.runningJobs);
-  els.pendingJobs.textContent = number(summary.pendingJobs);
-  els.totalNodes.textContent = number(summary.totalNodes);
+function renderResourceSummary(summary) {
   const cpuPct = percent(summary.allocatedCpus, summary.totalCpus);
   const memoryPct = percent(summary.allocatedMemoryMb, summary.totalMemoryMb);
   els.cpuAllocation.textContent = `${number(summary.allocatedCpus)} / ${number(summary.totalCpus)} cores (${cpuPct}%)`;
@@ -196,7 +190,7 @@ function render(data) {
   state.data = data;
   els.clusterHost.textContent = data.host || "Cluster";
   els.lastUpdated.textContent = new Date(data.generatedAt).toLocaleTimeString();
-  setSummary(data.summary);
+  renderResourceSummary(data.summary);
   renderQueue(data.activeJobs || []);
   renderNodeResources(data.nodeResources || []);
   renderHistory(data.recentJobs || []);
@@ -235,6 +229,6 @@ els.navButtons.forEach((button) => {
 });
 window.addEventListener("hashchange", () => setView(getInitialView(), { skipHistory: true }));
 
-setView(getInitialView(), { skipHistory: true });
+setView(getInitialView());
 resetTimer();
 loadCluster();

@@ -195,36 +195,11 @@ button:hover {
   text-transform: uppercase;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.stat,
 .panel {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--shadow);
-}
-
-.stat {
-  padding: 16px;
-  min-height: 96px;
-  display: grid;
-  align-content: space-between;
-}
-
-.stat span {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.stat strong {
-  font-size: clamp(28px, 4vw, 42px);
-  line-height: 1;
 }
 
 .panel {
@@ -474,9 +449,6 @@ tbody tr:hover {
     align-items: end;
   }
 
-  .stats-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 760px) {
@@ -488,7 +460,6 @@ tbody tr:hover {
 
   .section-nav,
   .sidebar-controls,
-  .stats-grid,
   .resource-summary {
     grid-template-columns: 1fr;
   }
