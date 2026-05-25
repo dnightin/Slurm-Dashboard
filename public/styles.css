@@ -150,6 +150,12 @@ main {
   font-weight: 700;
 }
 
+.search-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+}
+
 input,
 select,
 button {
@@ -180,6 +186,13 @@ button {
 
 button:hover {
   background: var(--accent-strong);
+}
+
+.icon-button {
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .stats-grid {

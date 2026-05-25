@@ -25,6 +25,7 @@ const els = {
   nodeStates: document.querySelector("#nodeStates"),
   commandHealth: document.querySelector("#commandHealth"),
   refreshButton: document.querySelector("#refreshButton"),
+  clearSearchButton: document.querySelector("#clearSearchButton"),
   refreshSelect: document.querySelector("#refreshSelect"),
   searchInput: document.querySelector("#searchInput"),
   queueCaption: document.querySelector("#queueCaption"),
@@ -87,10 +88,12 @@ function setSummary(summary) {
 
 function renderQueue(jobs) {
   const rows = jobs.filter(matchesQuery);
-  els.queueCaption.textContent = `${number(rows.length)} active jobs from squeue`;
+  els.queueCaption.textContent = state.query
+    ? `${number(rows.length)} of ${number(jobs.length)} active jobs match the current search`
+    : `${number(jobs.length)} active jobs from squeue`;
 
   if (!rows.length) {
-    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">No active jobs match the current view.</td></tr>`;
+    els.queueBody.innerHTML = `<tr><td colspan="8" class="empty">${state.query ? "No active jobs match the current search." : "No active jobs are currently queued."}</td></tr>`;
     return;
   }
 
@@ -110,10 +113,12 @@ function renderQueue(jobs) {
 
 function renderHistory(jobs) {
   const rows = jobs.filter(matchesQuery).slice(0, 250);
-  els.historyCaption.textContent = `${number(rows.length)} recent jobs from sacct`;
+  els.historyCaption.textContent = state.query
+    ? `${number(rows.length)} of ${number(jobs.length)} recent jobs match the current search`
+    : `${number(jobs.length)} recent jobs from sacct`;
 
   if (!rows.length) {
-    els.historyBody.innerHTML = `<tr><td colspan="8" class="empty">No recent accounting rows match the current view.</td></tr>`;
+    els.historyBody.innerHTML = `<tr><td colspan="8" class="empty">${state.query ? "No recent accounting rows match the current search." : "No recent accounting rows are available."}</td></tr>`;
     return;
   }
 
@@ -133,10 +138,12 @@ function renderHistory(jobs) {
 
 function renderNodeResources(nodes) {
   const rows = nodes.filter(matchesQuery);
-  els.nodeResourceCaption.textContent = `${number(rows.length)} nodes from scontrol`;
+  els.nodeResourceCaption.textContent = state.query
+    ? `${number(rows.length)} of ${number(nodes.length)} nodes match the current search`
+    : `${number(nodes.length)} nodes from scontrol`;
 
   if (!rows.length) {
-    els.nodeResourceBody.innerHTML = `<tr><td colspan="7" class="empty">No node allocation rows match the current view.</td></tr>`;
+    els.nodeResourceBody.innerHTML = `<tr><td colspan="7" class="empty">${state.query ? "No node allocation rows match the current search." : "No node allocation rows are available from scontrol."}</td></tr>`;
     return;
   }
 
@@ -258,6 +265,11 @@ function resetTimer() {
 }
 
 els.refreshButton.addEventListener("click", loadCluster);
+els.clearSearchButton.addEventListener("click", () => {
+  els.searchInput.value = "";
+  state.query = "";
+  if (state.data) render(state.data);
+});
 els.refreshSelect.addEventListener("change", resetTimer);
 els.searchInput.addEventListener("input", (event) => {
   state.query = event.target.value.trim().toLowerCase();
