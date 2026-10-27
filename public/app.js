@@ -20,6 +20,7 @@ const state = {
 };
 
 const IDLE_REFRESH_MS = 60 * 60 * 1000;
+const HISTORY_ROW_LIMIT = 250;
 
 const els = {
   clusterHost: document.querySelector("#clusterHost"),
@@ -93,12 +94,13 @@ function memory(value) {
   return `${number(mb)} MB`;
 }
 
-function stateClass(value) {
+function normalizedState(value) {
   return text(value, "unknown").toLowerCase().replace(/[^a-z0-9]+/g, "");
 }
 
-function normalizedState(value) {
-  return stateClass(value);
+function stateClass(value) {
+  // Slurm appends flags ("IDLE+DRAIN") and actors ("CANCELLED by 1001"); style by the base state.
+  return normalizedState(text(value, "unknown").split(/[\s+]/)[0]);
 }
 
 function rowMatchesQuery(row, query) {
@@ -108,19 +110,23 @@ function rowMatchesQuery(row, query) {
 
 function queueGroup(job) {
   const normalized = normalizedState(job.state);
-  if (normalized.includes("run")) return "running";
-  if (normalized.includes("pend")) return "pending";
   if (["held", "hold", "suspended", "stopped", "blocked"].some((part) => normalized.includes(part))) return "blocked";
-  if (text(job.reason, "").match(/dependency|priority|resources|assoc|qos|license|partition/i)) return "blocked";
+  if (normalized.includes("run")) return "running";
+  if (normalized.includes("pend")) {
+    // Held and dependency-bound jobs are still PENDING in Slurm; only the reason says they cannot start.
+    return text(job.reason, "").match(/held|dependency|assoc|qos|partition|invalid|reqnodenotavail/i) ? "blocked" : "pending";
+  }
   return normalized || "unknown";
 }
 
 function nodeGroup(node) {
   const normalized = normalizedState(node.state);
+  // Check unavailable flags first so IDLE+DRAIN is not shown as idle; powered-down cloud nodes are not faults.
+  const flags = normalized.replace(/power(ed|ing)?down/g, "");
+  if (["down", "drain", "fail", "maint", "unknown"].some((part) => flags.includes(part))) return "down";
   if (normalized.includes("idle")) return "idle";
   if (normalized.includes("mix")) return "mixed";
   if (normalized.includes("alloc")) return "allocated";
-  if (["down", "drain", "fail", "maint", "unknown"].some((part) => normalized.includes(part))) return "down";
   return normalized || "unknown";
 }
 
@@ -128,14 +134,34 @@ function accountingGroup(job) {
   const normalized = normalizedState(job.state);
   if (normalized.includes("complete")) return "completed";
   if (normalized.includes("cancel")) return "cancelled";
-  if (["fail", "timeout", "nodefail", "oom", "deadline"].some((part) => normalized.includes(part))) return "failed";
+  if (["fail", "timeout", "nodefail", "oom", "outofmemory", "deadline"].some((part) => normalized.includes(part))) return "failed";
   return normalized || "unknown";
 }
 
+function durationSeconds(value) {
+  // Slurm durations: [HH:]MM:SS[.mmm] or D-HH[:MM[:SS]].
+  const match = value.match(/^(?:(\d+)-)?(\d+(?::\d+){0,2}(?:\.\d+)?)$/);
+  if (!match || (!match[1] && !match[2].includes(":"))) return null;
+  const parts = match[2].split(":").map(Number);
+  while (parts.length < 3) {
+    if (match[1]) parts.push(0);
+    else parts.unshift(0);
+  }
+  const [hours, minutes, seconds] = parts;
+  return Number(match[1] || 0) * 86400 + hours * 3600 + minutes * 60 + seconds;
+}
+
+function sortableNumber(value) {
+  const normalized = text(value, "");
+  if (!normalized) return null;
+  const numeric = Number(normalized);
+  return Number.isFinite(numeric) ? numeric : durationSeconds(normalized);
+}
+
 function compareValues(a, b) {
-  const aNumber = Number(a);
-  const bNumber = Number(b);
-  if (Number.isFinite(aNumber) && Number.isFinite(bNumber)) return aNumber - bNumber;
+  const aNumber = sortableNumber(a);
+  const bNumber = sortableNumber(b);
+  if (aNumber !== null && bNumber !== null) return aNumber - bNumber;
   return String(a || "").localeCompare(String(b || ""), undefined, { numeric: true, sensitivity: "base" });
 }
 
@@ -233,7 +259,7 @@ function renderQueue(jobs) {
     <tr>
       <td><strong>${escapeHtml(job.jobId)}</strong><br><small>${escapeHtml(job.name)}</small></td>
       <td>${escapeHtml(job.user)}</td>
-      <td><span class="state ${stateClass(job.state)}">${escapeHtml(job.state)}</span></td>
+      <td><span class="state ${stateClass(job.state)} ${queueGroup(job)}">${escapeHtml(job.state)}</span></td>
       <td>${escapeHtml(job.partition)}</td>
       <td>${escapeHtml(job.time)} / ${escapeHtml(job.timeLimit)}</td>
       <td>${escapeHtml(job.cpus)}</td>
@@ -256,7 +282,7 @@ function renderNodeGrid(rows) {
       <article class="node-card node-${nodeGroup(node)}">
         <header>
           <strong>${escapeHtml(node.name)}</strong>
-          <span class="state ${stateClass(node.state)}">${escapeHtml(node.state)}</span>
+          <span class="state ${stateClass(node.state)} ${nodeGroup(node)}">${escapeHtml(node.state)}</span>
         </header>
         <div class="node-metrics">
           <span>CPU ${number(node.cpuAllocated)} / ${number(node.cpuTotal)}</span>
@@ -295,7 +321,7 @@ function renderNodeResources(nodes) {
     return `
       <tr>
         <td><strong>${escapeHtml(node.name)}</strong><br><small>${escapeHtml(node.hostname || node.address)}</small></td>
-        <td><span class="state ${stateClass(node.state)}">${escapeHtml(node.state)}</span></td>
+        <td><span class="state ${stateClass(node.state)} ${nodeGroup(node)}">${escapeHtml(node.state)}</span></td>
         <td>
           <div class="metric-cell">
             <span>${number(node.cpuAllocated)} / ${number(node.cpuTotal)} cores</span>
@@ -319,11 +345,12 @@ function renderHistory(jobs) {
   const filtered = jobs
     .filter((job) => filter === "all" || accountingGroup(job) === filter)
     .filter((job) => rowMatchesQuery(job, query));
-  const rows = sortedRows(filtered, "accounting").slice(0, 250);
+  const rows = sortedRows(filtered, "accounting").slice(0, HISTORY_ROW_LIMIT);
+  const truncated = filtered.length > rows.length ? `, showing ${number(rows.length)}` : "";
 
   els.historyCaption.textContent = query || filter !== "all"
-    ? `${number(rows.length)} of ${number(jobs.length)} recent jobs match this view`
-    : `${number(jobs.length)} recent jobs from sacct`;
+    ? `${number(filtered.length)} of ${number(jobs.length)} recent jobs match this view${truncated}`
+    : `${number(jobs.length)} recent jobs from sacct${truncated}`;
 
   if (!rows.length) {
     els.historyBody.innerHTML = `<tr><td colspan="8" class="empty">${jobs.length ? "No recent accounting rows match this view." : "No recent accounting rows are available."}</td></tr>`;
@@ -334,7 +361,7 @@ function renderHistory(jobs) {
     <tr>
       <td><strong>${escapeHtml(job.jobId)}</strong><br><small>${escapeHtml(job.name)}</small></td>
       <td>${escapeHtml(job.user)}</td>
-      <td><span class="state ${stateClass(job.state)}">${escapeHtml(job.state)}</span></td>
+      <td><span class="state ${stateClass(job.state)} ${accountingGroup(job)}">${escapeHtml(job.state)}</span></td>
       <td>${escapeHtml(job.partition)}</td>
       <td>${escapeHtml(job.elapsed)}</td>
       <td>${escapeHtml(job.totalCpu)}</td>

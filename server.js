@@ -220,6 +220,7 @@ async function collectClusterData() {
     runCommand("sacct", [
       "-n",
       "-P",
+      "-X",
       "-S",
       HISTORY_START,
       "-o",
