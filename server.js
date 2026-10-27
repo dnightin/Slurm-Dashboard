@@ -9,6 +9,11 @@ const HOST = process.env.HOST || "0.0.0.0";
 const PUBLIC_DIR = path.join(__dirname, "public");
 const COMMAND_TIMEOUT_MS = Number(process.env.SLURM_COMMAND_TIMEOUT_MS || 12000);
 const HISTORY_START = process.env.SLURM_HISTORY_START || "now-24hours";
+const CACHE_TTL_MS = Number(process.env.SLURM_CACHE_TTL_MS || 30000);
+
+let cachedData = null;
+let cachedAt = 0;
+let inFlight = null;
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -96,17 +101,6 @@ function parseSacct(output) {
   ]);
 }
 
-function parseSinfo(output) {
-  return parsePipeRows(output, [
-    "partition",
-    "availability",
-    "timeLimit",
-    "nodes",
-    "state",
-    "nodeList"
-  ]);
-}
-
 function parseScontrolNodes(output) {
   return output
     .split(/\r?\n/)
@@ -143,16 +137,6 @@ function parseScontrolNodes(output) {
         hostname: node.NodeHostName || ""
       };
     });
-}
-
-function parseNodeSummaries(partitions) {
-  return partitions.reduce((acc, partition) => {
-    const state = normalizeState(partition.state);
-    const count = Number.parseInt(partition.nodes, 10) || 0;
-    acc.total += count;
-    acc.byState[state] = (acc.byState[state] || 0) + count;
-    return acc;
-  }, { total: 0, byState: {} });
 }
 
 function normalizeState(state) {
@@ -211,7 +195,7 @@ function commandStatus(results) {
 }
 
 async function collectClusterData() {
-  const [squeue, sacct, sinfo, scontrolNodes] = await Promise.all([
+  const [squeue, sacct, scontrolNodes] = await Promise.all([
     runCommand("squeue", [
       "-h",
       "-o",
@@ -226,11 +210,6 @@ async function collectClusterData() {
       "-o",
       "JobID,JobName,User,Account,Partition,State,Elapsed,TotalCPU,AllocCPUS,ReqMem,Submit,Start,End,NodeList,ExitCode"
     ]),
-    runCommand("sinfo", [
-      "-h",
-      "-o",
-      "%P|%a|%l|%D|%t|%N"
-    ]),
     runCommand("scontrol", [
       "show",
       "nodes",
@@ -240,10 +219,8 @@ async function collectClusterData() {
 
   const activeJobs = squeue.ok ? parseSqueue(squeue.stdout) : [];
   const recentJobs = sacct.ok ? parseSacct(sacct.stdout) : [];
-  const partitions = sinfo.ok ? parseSinfo(sinfo.stdout) : [];
   const nodeResources = scontrolNodes.ok ? parseScontrolNodes(scontrolNodes.stdout) : [];
   const resourceSummary = summarizeNodeResources(nodeResources);
-  const nodes = parseNodeSummaries(partitions);
   const jobs = summarizeJobs(activeJobs, recentJobs);
 
   return {
@@ -256,21 +233,40 @@ async function collectClusterData() {
       runningJobs: jobs.running,
       pendingJobs: jobs.pending,
       activeUsers: jobs.users,
-      totalNodes: nodeResources.length || nodes.total,
+      totalNodes: nodeResources.length,
       allocatedCpus: resourceSummary.cpuAllocated,
       totalCpus: resourceSummary.cpuTotal,
       allocatedMemoryMb: resourceSummary.memoryAllocated,
       totalMemoryMb: resourceSummary.memoryTotal
     },
     jobs,
-    nodes,
     activeJobs,
     recentJobs,
-    partitions,
     nodeResources,
     resourceSummary,
-    commands: commandStatus({ squeue, sacct, sinfo, scontrol: scontrolNodes })
+    commands: commandStatus({ squeue, sacct, scontrol: scontrolNodes })
   };
+}
+
+// Serve recent results and share one in-flight collection so many open tabs don't each hit slurmctld.
+function getClusterData() {
+  if (cachedData && Date.now() - cachedAt < CACHE_TTL_MS) {
+    return Promise.resolve(cachedData);
+  }
+
+  if (!inFlight) {
+    inFlight = collectClusterData()
+      .then((data) => {
+        cachedData = data;
+        cachedAt = Date.now();
+        return data;
+      })
+      .finally(() => {
+        inFlight = null;
+      });
+  }
+
+  return inFlight;
 }
 
 function sendJson(response, status, body) {
@@ -284,8 +280,9 @@ function sendJson(response, status, body) {
 function sendFile(response, filePath) {
   fs.readFile(filePath, (error, content) => {
     if (error) {
-      sendJson(response, error.code === "ENOENT" ? 404 : 500, {
-        error: error.code === "ENOENT" ? "Not found" : "Unable to read file"
+      const notFound = error.code === "ENOENT" || error.code === "EISDIR";
+      sendJson(response, notFound ? 404 : 500, {
+        error: notFound ? "Not found" : "Unable to read file"
       });
       return;
     }
@@ -297,8 +294,8 @@ function sendFile(response, filePath) {
   });
 }
 
-function resolvePublicPath(urlPath) {
-  const decodedPath = decodeURIComponent(urlPath.split("?")[0]);
+function resolvePublicPath(pathname) {
+  const decodedPath = decodeURIComponent(pathname);
   const normalized = path.normalize(decodedPath === "/" ? "/index.html" : decodedPath);
   const requested = path.join(PUBLIC_DIR, normalized);
   const relative = path.relative(PUBLIC_DIR, requested);
@@ -312,12 +309,20 @@ function resolvePublicPath(urlPath) {
 
 const server = http.createServer(async (request, response) => {
   try {
-    if (request.url === "/api/cluster") {
-      sendJson(response, 200, await collectClusterData());
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      response.setHeader("Allow", "GET, HEAD");
+      sendJson(response, 405, { error: "Method not allowed" });
       return;
     }
 
-    if (request.url === "/api/health") {
+    const pathname = (request.url || "/").split("?")[0];
+
+    if (pathname === "/api/cluster") {
+      sendJson(response, 200, await getClusterData());
+      return;
+    }
+
+    if (pathname === "/api/health") {
       sendJson(response, 200, {
         ok: true,
         generatedAt: new Date().toISOString(),
@@ -326,7 +331,14 @@ const server = http.createServer(async (request, response) => {
       return;
     }
 
-    const filePath = resolvePublicPath(request.url || "/");
+    let filePath;
+    try {
+      filePath = resolvePublicPath(pathname);
+    } catch (error) {
+      sendJson(response, 400, { error: "Bad request" });
+      return;
+    }
+
     if (!filePath) {
       sendJson(response, 403, { error: "Forbidden" });
       return;
@@ -335,7 +347,7 @@ const server = http.createServer(async (request, response) => {
     sendFile(response, filePath);
   } catch (error) {
     sendJson(response, 500, {
-      error: "Unable to collect cluster data",
+      error: "Internal server error",
       detail: error.message
     });
   }
