@@ -167,6 +167,11 @@ button:hover {
   background: var(--accent-strong);
 }
 
+button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
 .page-heading {
   display: flex;
   align-items: end;
@@ -372,6 +377,18 @@ tbody tr:hover {
   background: transparent;
   color: var(--accent);
   outline: none;
+}
+
+.sort-button.is-active {
+  color: var(--accent-strong);
+}
+
+.sort-button[data-direction="asc"]::after {
+  content: " \25B2";
+}
+
+.sort-button[data-direction="desc"]::after {
+  content: " \25BC";
 }
 
 .empty {

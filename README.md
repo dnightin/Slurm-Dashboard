@@ -2,7 +2,7 @@
 
 A compact, npm-powered dashboard for Slurm clusters. The Node backend shells out to standard Slurm tools and serves a dense operations UI with separate pages for live queue activity, per-node resource allocation, and recent accounting history.
 
-The app is intentionally small: no database, no build step, and no external runtime dependencies. It is meant to run close to a Slurm login or controller host where `squeue`, `sacct`, `sinfo`, and `scontrol` are already available.
+The app is intentionally small: no database, no build step, and no external runtime dependencies. It is meant to run close to a Slurm login or controller host where `squeue`, `sacct`, and `scontrol` are already available.
 
 ## Screenshots
 
@@ -29,10 +29,9 @@ Screenshots use demo cluster data so the UI is visible outside a Slurm environme
 
 - `squeue` for active queue data
 - `sacct` for recent accounting data
-- `sinfo` for supporting partition and node-state summaries
 - `scontrol show nodes -o` for per-node CPU, memory, and state allocation
 
-Each command is collected independently. If one command is unavailable or times out, the dashboard still renders the remaining data and reports the issue on the affected page.
+Each command is collected independently. If one command is unavailable or times out, the dashboard still renders the remaining data and reports the issue on the affected page. Results are cached briefly and concurrent requests share one collection, so many open tabs do not multiply load on `slurmctld`.
 
 ## Requirements
 
@@ -58,6 +57,7 @@ Environment variables:
 - `HOST`: bind address, defaults to `0.0.0.0`
 - `SLURM_COMMAND_TIMEOUT_MS`: timeout per Slurm command, defaults to `12000`
 - `SLURM_HISTORY_START`: `sacct -S` start value, defaults to `now-24hours`
+- `SLURM_CACHE_TTL_MS`: how long collected data is reused before running the Slurm commands again, defaults to `30000`
 
 Example:
 

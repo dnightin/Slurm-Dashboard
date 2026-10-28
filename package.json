@@ -1,7 +1,7 @@
 {
   "name": "slurm-dashboard",
   "version": "0.1.0",
-  "description": "A lightweight npm-powered Slurm cluster dashboard backed by sacct, sinfo, and squeue.",
+  "description": "A lightweight npm-powered Slurm cluster dashboard backed by squeue, sacct, and scontrol.",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

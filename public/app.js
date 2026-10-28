@@ -1,6 +1,7 @@
 const state = {
   data: null,
   timer: null,
+  requestId: 0,
   view: "queue",
   filters: {
     queue: "all",
@@ -390,20 +391,37 @@ function render(data) {
   renderHistory(recentJobs);
 }
 
-async function loadCluster() {
-  setFreshness(null);
+function setRefreshing(isRefreshing) {
+  for (const button of els.refreshButtons) button.disabled = isRefreshing;
+  if (!isRefreshing) return;
   els.lastUpdated.textContent = "Refreshing";
   for (const item of els.freshnessLabels) item.textContent = "Refreshing";
+}
+
+function renderLoadError(error) {
+  els.lastUpdated.textContent = "Error";
+  for (const item of els.freshnessLabels) item.textContent = "Error";
+  for (const element of [els.queueCommandAlert, els.nodeCommandAlert, els.accountingCommandAlert]) {
+    element.hidden = false;
+    element.textContent = `Unable to load cluster data: ${error.message}`;
+  }
+}
+
+async function loadCluster() {
+  // Only the latest request may render, so a slow earlier response can't overwrite newer data.
+  const requestId = ++state.requestId;
+  resetTimer();
+  setRefreshing(true);
 
   try {
     const response = await fetch("/api/cluster", { cache: "no-store" });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    render(await response.json());
+    const data = await response.json();
+    if (requestId === state.requestId) render(data);
   } catch (error) {
-    els.lastUpdated.textContent = "Error";
-    for (const item of els.freshnessLabels) item.textContent = "Error";
-    els.queueCommandAlert.hidden = false;
-    els.queueCommandAlert.textContent = error.message;
+    if (requestId === state.requestId) renderLoadError(error);
+  } finally {
+    if (requestId === state.requestId) setRefreshing(false);
   }
 }
 
@@ -412,8 +430,21 @@ function resetTimer() {
   state.timer = setInterval(loadCluster, IDLE_REFRESH_MS);
 }
 
-function refreshCurrentData() {
-  if (state.data) render(state.data);
+function renderTable(table) {
+  if (!state.data) return;
+  if (table === "queue") renderQueue(state.data.activeJobs || []);
+  if (table === "nodes") renderNodeResources(state.data.nodeResources || []);
+  if (table === "accounting") renderHistory(state.data.recentJobs || []);
+}
+
+function updateSortButtons() {
+  for (const button of els.sortButtons) {
+    const sort = state.sorts[button.dataset.sortTable];
+    const isActive = sort.key === button.dataset.sortKey;
+    button.classList.toggle("is-active", isActive);
+    button.dataset.direction = isActive ? sort.direction : "";
+    button.closest("th").setAttribute("aria-sort", isActive ? (sort.direction === "asc" ? "ascending" : "descending") : "none");
+  }
 }
 
 function updateFilterButtons(group) {
@@ -425,22 +456,22 @@ function updateFilterButtons(group) {
 els.refreshButtons.forEach((button) => button.addEventListener("click", loadCluster));
 els.queueSearchInput.addEventListener("input", (event) => {
   state.queries.queue = event.target.value.trim().toLowerCase();
-  refreshCurrentData();
+  renderTable("queue");
 });
 els.nodeSearchInput.addEventListener("input", (event) => {
   state.queries.nodes = event.target.value.trim().toLowerCase();
-  refreshCurrentData();
+  renderTable("nodes");
 });
 els.accountingSearchInput.addEventListener("input", (event) => {
   state.queries.accounting = event.target.value.trim().toLowerCase();
-  refreshCurrentData();
+  renderTable("accounting");
 });
 els.filterButtons.forEach((button) => {
   button.addEventListener("click", () => {
     const group = button.dataset.filterGroup;
     state.filters[group] = button.dataset.filterValue;
     updateFilterButtons(group);
-    refreshCurrentData();
+    renderTable(group);
   });
 });
 els.sortButtons.forEach((button) => {
@@ -452,7 +483,8 @@ els.sortButtons.forEach((button) => {
       key,
       direction: current.key === key && current.direction === "asc" ? "desc" : "asc"
     };
-    refreshCurrentData();
+    updateSortButtons();
+    renderTable(table);
   });
 });
 els.navButtons.forEach((button) => {
@@ -461,5 +493,5 @@ els.navButtons.forEach((button) => {
 window.addEventListener("hashchange", () => setView(getInitialView(), { skipHistory: true }));
 
 setView(getInitialView());
-resetTimer();
+updateSortButtons();
 loadCluster();
